@@ -1,3 +1,4 @@
+// backend/models/Task.js - Task management model
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 

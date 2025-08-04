@@ -1,3 +1,4 @@
+// backend/models/Document.js - Document management model
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 

@@ -1,8 +1,9 @@
+// backend/database/connection.js - Database connection setup
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'business_management_db',
+  process.env.DB_NAME || 'feed_pro',
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {

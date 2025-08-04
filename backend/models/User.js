@@ -1,3 +1,4 @@
+// backend/models/User.js - Enhanced user model
 const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const sequelize = require('../database/connection');

@@ -1,3 +1,4 @@
+// backend/models/FeedbackThread.js - Threaded feedback system
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 

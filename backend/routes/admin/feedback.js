@@ -1,9 +1,17 @@
+<<<<<<< HEAD
+=======
+// backend/routes/admin/feedback.js - Admin feedback management (COMPLETED)
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { FeedbackThread, FeedbackMessage } = require('../../models/FeedbackThread');
 const User = require('../../models/User');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 const { Op } = require('sequelize');
+<<<<<<< HEAD
+=======
+const sequelize = require('../../config/database');
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 const router = express.Router();
 
 // Apply auth middleware
@@ -23,6 +31,10 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     let whereClause = {};
+<<<<<<< HEAD
+=======
+    let clientWhereClause = {};
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     
     // Apply filters
     if (status && status !== 'all') whereClause.status = status;
@@ -34,6 +46,14 @@ router.get('/', async (req, res) => {
       whereClause[Op.or] = [
         { subject: { [Op.iLike]: `%${search}%` } }
       ];
+<<<<<<< HEAD
+=======
+      
+      clientWhereClause[Op.or] = [
+        { fullname: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } }
+      ];
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     }
 
     const offset = (page - 1) * limit;
@@ -44,6 +64,7 @@ router.get('/', async (req, res) => {
         { 
           model: User, 
           as: 'client', 
+<<<<<<< HEAD
           attributes: ['fullname', 'email'],
           where: search ? {
             [Op.or]: [
@@ -51,13 +72,26 @@ router.get('/', async (req, res) => {
               { email: { [Op.iLike]: `%${search}%` } }
             ]
           } : undefined
+=======
+          attributes: ['id', 'fullname', 'email'],
+          where: search ? clientWhereClause : undefined,
+          required: search ? true : false
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
         },
         {
           model: FeedbackMessage,
           as: 'messages',
           limit: 1,
           order: [['created_at', 'DESC']],
+<<<<<<< HEAD
           include: [{ model: User, as: 'sender', attributes: ['fullname'] }]
+=======
+          include: [{ 
+            model: User, 
+            as: 'sender', 
+            attributes: ['id', 'fullname', 'role'] 
+          }]
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
         }
       ],
       order: [['updated_at', 'DESC']],
@@ -70,12 +104,17 @@ router.get('/', async (req, res) => {
     const stats = await FeedbackThread.findAll({
       attributes: [
         'status',
+<<<<<<< HEAD
         [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+=======
+        [sequelize.fn('COUNT', sequelize.col('FeedbackThread.id')), 'count']
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
       ],
       group: ['status'],
       raw: true
     });
 
+<<<<<<< HEAD
     res.json({
       success: true,
       data: threads,
@@ -83,6 +122,17 @@ router.get('/', async (req, res) => {
         acc[stat.status] = parseInt(stat.count);
         return acc;
       }, {}),
+=======
+    const statsObject = stats.reduce((acc, stat) => {
+      acc[stat.status] = parseInt(stat.count);
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      data: threads,
+      stats: statsObject,
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
       pagination: {
         total: count,
         page: parseInt(page),
@@ -96,7 +146,11 @@ router.get('/', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch feedback threads',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
   }
 });
@@ -107,11 +161,27 @@ router.get('/thread/:threadId', async (req, res) => {
     const thread = await FeedbackThread.findOne({
       where: { thread_id: req.params.threadId },
       include: [
+<<<<<<< HEAD
         { model: User, as: 'client', attributes: ['fullname', 'email'] },
         {
           model: FeedbackMessage,
           as: 'messages',
           include: [{ model: User, as: 'sender', attributes: ['fullname'] }],
+=======
+        { 
+          model: User, 
+          as: 'client', 
+          attributes: ['id', 'fullname', 'email', 'phone'] 
+        },
+        {
+          model: FeedbackMessage,
+          as: 'messages',
+          include: [{ 
+            model: User, 
+            as: 'sender', 
+            attributes: ['id', 'fullname', 'role'] 
+          }],
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
           order: [['created_at', 'ASC']]
         }
       ]
@@ -124,11 +194,24 @@ router.get('/thread/:threadId', async (req, res) => {
       });
     }
 
+<<<<<<< HEAD
+=======
+    // Count unread client messages
+    const unreadCount = thread.messages.filter(msg => 
+      msg.sender_type === 'client' && !msg.is_read
+    ).length;
+
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     res.json({
       success: true,
       data: {
         thread,
+<<<<<<< HEAD
         messages: thread.messages
+=======
+        messages: thread.messages,
+        unreadCount
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
       }
     });
 
@@ -137,7 +220,11 @@ router.get('/thread/:threadId', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch thread',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
   }
 });
@@ -181,7 +268,12 @@ router.post('/thread/:threadId/reply', [
       thread_id: req.params.threadId,
       sender_id: req.user.id,
       sender_type: 'admin',
+<<<<<<< HEAD
       message: req.body.message
+=======
+      message: req.body.message,
+      is_read: false
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
 
     // Update thread status
@@ -190,10 +282,26 @@ router.post('/thread/:threadId/reply', [
       updated_at: new Date()
     });
 
+<<<<<<< HEAD
     res.status(201).json({
       success: true,
       message: 'Reply sent successfully',
       data: message
+=======
+    // Include sender details in response
+    const messageWithSender = await FeedbackMessage.findByPk(message.id, {
+      include: [{ 
+        model: User, 
+        as: 'sender', 
+        attributes: ['id', 'fullname', 'role'] 
+      }]
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Reply sent successfully',
+      data: messageWithSender
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
 
   } catch (error) {
@@ -201,14 +309,23 @@ router.post('/thread/:threadId/reply', [
     res.status(500).json({
       success: false,
       message: 'Failed to send reply',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
   }
 });
 
 // PATCH: Update thread status
 router.patch('/thread/:threadId/status', [
+<<<<<<< HEAD
   body('status').isIn(['open', 'in_progress', 'resolved', 'closed']).withMessage('Invalid status')
+=======
+  body('status').isIn(['open', 'in_progress', 'resolved', 'closed']).withMessage('Invalid status'),
+  body('reason').optional().trim().isLength({ max: 500 }).withMessage('Reason too long')
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -231,10 +348,30 @@ router.patch('/thread/:threadId/status', [
       });
     }
 
+<<<<<<< HEAD
     await thread.update({ 
       status: req.body.status,
       updated_at: new Date()
     });
+=======
+    const updateData = { 
+      status: req.body.status,
+      updated_at: new Date()
+    };
+
+    // If closing or resolving, add admin note
+    if (['resolved', 'closed'].includes(req.body.status) && req.body.reason) {
+      await FeedbackMessage.create({
+        thread_id: req.params.threadId,
+        sender_id: req.user.id,
+        sender_type: 'admin',
+        message: `Thread ${req.body.status}: ${req.body.reason}`,
+        is_read: false
+      });
+    }
+
+    await thread.update(updateData);
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 
     res.json({
       success: true,
@@ -247,7 +384,11 @@ router.patch('/thread/:threadId/status', [
     res.status(500).json({
       success: false,
       message: 'Failed to update thread status',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
   }
 });
@@ -267,7 +408,11 @@ router.patch('/thread/:threadId/read', async (req, res) => {
     }
 
     // Mark client messages as read
+<<<<<<< HEAD
     await FeedbackMessage.update(
+=======
+    const [updatedCount] = await FeedbackMessage.update(
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
       { is_read: true },
       {
         where: {
@@ -280,7 +425,12 @@ router.patch('/thread/:threadId/read', async (req, res) => {
 
     res.json({
       success: true,
+<<<<<<< HEAD
       message: 'Messages marked as read'
+=======
+      message: 'Messages marked as read',
+      markedCount: updatedCount
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
 
   } catch (error) {
@@ -288,7 +438,11 @@ router.patch('/thread/:threadId/read', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to mark messages as read',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
     });
   }
 });
@@ -412,9 +566,146 @@ router.get('/analytics', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch analytics',
+<<<<<<< HEAD
       error: error.message
+=======
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
+    });
+  }
+});
+
+<<<<<<< HEAD
+module.exports = router;
+=======
+// DELETE: Delete feedback thread (soft delete)
+router.delete('/thread/:threadId', async (req, res) => {
+  try {
+    const thread = await FeedbackThread.findOne({
+      where: { thread_id: req.params.threadId }
+    });
+
+    if (!thread) {
+      return res.status(404).json({
+        success: false,
+        message: 'Thread not found'
+      });
+    }
+
+    // Soft delete by updating status
+    await thread.update({ 
+      status: 'deleted',
+      updated_at: new Date()
+    });
+
+    // Add deletion note
+    await FeedbackMessage.create({
+      thread_id: req.params.threadId,
+      sender_id: req.user.id,
+      sender_type: 'admin',
+      message: 'Thread deleted by admin',
+      is_read: false
+    });
+
+    res.json({
+      success: true,
+      message: 'Thread deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting thread:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete thread',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// GET: Export feedback data
+router.get('/export', async (req, res) => {
+  try {
+    const { format = 'json', status, category, priority, dateFrom, dateTo } = req.query;
+
+    let whereClause = {};
+    
+    // Apply filters
+    if (status && status !== 'all') whereClause.status = status;
+    if (category && category !== 'all') whereClause.category = category;
+    if (priority && priority !== 'all') whereClause.priority = priority;
+    
+    if (dateFrom && dateTo) {
+      whereClause.created_at = {
+        [Op.between]: [new Date(dateFrom), new Date(dateTo)]
+      };
+    }
+
+    const threads = await FeedbackThread.findAll({
+      where: whereClause,
+      include: [
+        { 
+          model: User, 
+          as: 'client', 
+          attributes: ['fullname', 'email'] 
+        },
+        {
+          model: FeedbackMessage,
+          as: 'messages',
+          include: [{ 
+            model: User, 
+            as: 'sender', 
+            attributes: ['fullname', 'role'] 
+          }]
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    if (format === 'csv') {
+      // Convert to CSV format
+      const csvData = threads.map(thread => ({
+        'Thread ID': thread.thread_id,
+        'Subject': thread.subject,
+        'Category': thread.category,
+        'Priority': thread.priority,
+        'Status': thread.status,
+        'Client Name': thread.client?.fullname || 'N/A',
+        'Client Email': thread.client?.email || 'N/A',
+        'Created Date': thread.created_at,
+        'Updated Date': thread.updated_at,
+        'Message Count': thread.messages?.length || 0
+      }));
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=feedback-export.csv');
+      
+      // Simple CSV conversion (in production, use a proper CSV library)
+      const headers = Object.keys(csvData[0] || {}).join(',');
+      const rows = csvData.map(row => Object.values(row).join(',')).join('\n');
+      res.send(headers + '\n' + rows);
+    } else {
+      // JSON format
+      res.json({
+        success: true,
+        data: threads,
+        exportInfo: {
+          totalThreads: threads.length,
+          exportDate: new Date(),
+          filters: { status, category, priority, dateFrom, dateTo }
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error exporting feedback data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
 module.exports = router;
+
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc

@@ -14,7 +14,11 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+<<<<<<< HEAD
 target 'BhaicharaPro' do
+=======
+target 'feed_pro' do
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
   config = use_native_modules!
 
   use_react_native!(

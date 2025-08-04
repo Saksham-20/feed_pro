@@ -1,3 +1,4 @@
+// backend/models/Bill.js - Bill model
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 

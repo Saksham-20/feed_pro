@@ -1,3 +1,5 @@
+
+// backend/models/Lead.js - Lead management model
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 

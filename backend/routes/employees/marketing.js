@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+// backend/routes/employees/marketing.js - Marketing employee routes
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Campaign = require('../../models/Campaign');

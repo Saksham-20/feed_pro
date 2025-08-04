@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+// backend/routes/employees/office.js - Office employee routes
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Task = require('../../models/Task');
@@ -242,4 +246,8 @@ router.put('/tasks/:id', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 module.exports = router;
+=======
+module.exports = router;
+>>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
