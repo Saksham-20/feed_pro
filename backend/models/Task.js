@@ -8,13 +8,8 @@ const Task = sequelize.define('Task', {
     primaryKey: true,
     autoIncrement: true
   },
-  task_id: {
-    type: DataTypes.STRING(50),
-    unique: true,
-    allowNull: false
-  },
   title: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.STRING(200),
     allowNull: false
   },
   description: {
@@ -22,7 +17,7 @@ const Task = sequelize.define('Task', {
     allowNull: true
   },
   status: {
-    type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled'),
+    type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled', 'on_hold'),
     defaultValue: 'pending'
   },
   priority: {
@@ -30,7 +25,7 @@ const Task = sequelize.define('Task', {
     defaultValue: 'medium'
   },
   category: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.STRING(50),
     allowNull: true
   },
   created_by: {
@@ -50,25 +45,34 @@ const Task = sequelize.define('Task', {
     }
   },
   due_date: {
-    type: DataTypes.DATEONLY,
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  start_date: {
+    type: DataTypes.DATE,
     allowNull: true
   },
   completed_date: {
-    type: DataTypes.DATEONLY,
+    type: DataTypes.DATE,
     allowNull: true
   },
   estimated_hours: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
-    validate: {
-      min: 0
-    }
+    defaultValue: 0.00
   },
   actual_hours: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
+    defaultValue: 0.00
+  },
+  progress_percentage: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
     validate: {
-      min: 0
+      min: 0,
+      max: 100
     }
   },
   tags: {
@@ -78,20 +82,49 @@ const Task = sequelize.define('Task', {
   attachments: {
     type: DataTypes.JSON,
     defaultValue: []
+  },
+  dependencies: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    comment: 'Array of task IDs that this task depends on'
+  },
+  checklist: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    comment: 'Array of checklist items with completion status'
+  },
+  comments: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  recurring: {
+    type: DataTypes.JSON,
+    defaultValue: null,
+    comment: 'Recurring task configuration'
   }
 }, {
   tableName: 'tasks',
   timestamps: true,
   underscored: true,
   hooks: {
-    beforeCreate: (task) => {
-      if (!task.task_id) {
-        task.task_id = `TASK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      }
-    },
     beforeUpdate: (task) => {
+      // Auto-complete task when progress reaches 100%
+      if (task.changed('progress_percentage') && task.progress_percentage === 100 && task.status !== 'completed') {
+        task.status = 'completed';
+        task.completed_date = new Date();
+      }
+      
+      // Set completed date when status changes to completed
       if (task.changed('status') && task.status === 'completed' && !task.completed_date) {
         task.completed_date = new Date();
+        if (task.progress_percentage < 100) {
+          task.progress_percentage = 100;
+        }
+      }
+      
+      // Clear completed date if status changes from completed
+      if (task.changed('status') && task.status !== 'completed') {
+        task.completed_date = null;
       }
     }
   }

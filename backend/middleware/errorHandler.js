@@ -1,57 +1,101 @@
-// backend/middleware/errorHandler.js - Global error handler
+// backend/middleware/errorHandler.js - Error handling middleware
+const winston = require('winston');
+
+// Logger configuration
+const logger = winston.createLogger({
+  level: 'error',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'logs/error.log' }),
+    new winston.transports.Console({
+      format: winston.format.simple()
+    })
+  ]
+});
+
+// Error handler middleware
 const errorHandler = (err, req, res, next) => {
-  console.error('Error Stack:', err.stack);
-  
-  // Sequelize validation errors
+  let error = { ...err };
+  error.message = err.message;
+
+  // Log error
+  logger.error({
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+
+  // Mongoose bad ObjectId
+  if (err.name === 'CastError') {
+    const message = 'Resource not found';
+    error = { message, statusCode: 404 };
+  }
+
+  // Mongoose duplicate key
+  if (err.code === 11000) {
+    const message = 'Duplicate field value entered';
+    error = { message, statusCode: 400 };
+  }
+
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    const message = Object.values(err.errors).map(val => val.message).join(', ');
+    error = { message, statusCode: 400 };
+  }
+
+  // Sequelize validation error
   if (err.name === 'SequelizeValidationError') {
-    const errors = err.errors.map(error => ({
-      field: error.path,
-      message: error.message
-    }));
-    
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      errors
-    });
+    const message = err.errors.map(e => e.message).join(', ');
+    error = { message, statusCode: 400 };
   }
-  
-  // Sequelize unique constraint errors
+
+  // Sequelize unique constraint error
   if (err.name === 'SequelizeUniqueConstraintError') {
-    return res.status(409).json({
-      success: false,
-      message: 'Resource already exists',
-      field: err.errors[0]?.path
-    });
+    const message = 'Duplicate field value entered';
+    error = { message, statusCode: 400 };
   }
-  
+
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
+    const message = 'Invalid token';
+    error = { message, statusCode: 401 };
   }
-  
+
   if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
+    const message = 'Token expired';
+    error = { message, statusCode: 401 };
   }
-  
-  // Default error
-  const statusCode = err.statusCode || err.status || 500;
-  const message = err.message || 'Internal Server Error';
-  
-  res.status(statusCode).json({
+
+  // Multer errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    const message = 'File too large';
+    error = { message, statusCode: 400 };
+  }
+
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    const message = 'Too many files';
+    error = { message, statusCode: 400 };
+  }
+
+  res.status(error.statusCode || 500).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { 
-      stack: err.stack,
-      error: err
-    })
+    message: error.message || 'Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 };
 
-module.exports = errorHandler;
+// 404 handler
+const notFound = (req, res, next) => {
+  const error = new Error(`Not found - ${req.originalUrl}`);
+  res.status(404);
+  next(error);
+};
+
+module.exports = { errorHandler, notFound };

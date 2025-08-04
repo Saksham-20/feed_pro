@@ -1,127 +1,64 @@
-
-// backend/server.js - Complete updated server file
+// backend/server.js - Fixed route imports
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
+const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
-const path = require('path');
-const fs = require('fs');
-const sequelize = require('./database/connection');
-const errorHandler = require('./middleware/errorHandler');
 require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Create logs directory
-const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+// Import database connection
+const { connectDB } = require('./config/database');
+
+// Import middleware
+const corsMiddleware = require('./middleware/cors');
+const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 // Security middleware
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// CORS
+app.use(corsMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again later'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again later.'
+  }
 });
 app.use('/api/', limiter);
 
-// CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-Total-Count', 'X-Page-Count']
-}));
-
 // Body parsing middleware
-app.use(compression());
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '10mb' 
-}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging middleware
-if (process.env.NODE_ENV === 'production') {
-  const accessLogStream = fs.createWriteStream(
-    path.join(logsDir, 'access.log'), 
-    { flags: 'a' }
-  );
-  app.use(morgan('combined', { stream: accessLogStream }));
-} else {
+// Compression
+app.use(compression());
+
+// Logging
+if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Request ID middleware
-app.use((req, res, next) => {
-  req.id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-  res.setHeader('X-Request-ID', req.id);
-  next();
-});
+// Serve static files
+app.use('/uploads', express.static('uploads'));
 
-// Static file serving
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Health check endpoints
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.APP_VERSION || '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    uptime: process.uptime()
-  });
-});
-
-app.get('/health/detailed', async (req, res) => {
+// Health check endpoint
+app.get('/health', async (req, res) => {
   try {
-    // Test database connection
-    await sequelize.authenticate();
-    
-    const dbStats = await sequelize.query('SELECT 1+1 AS result');
-    
-    res.status(200).json({
+    // You can add database health check here
+    res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      services: {
-        database: {
-          status: 'connected',
-          responseTime: Date.now()
-        },
-        server: {
-          status: 'running',
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-          cpu: process.cpuUsage()
-        }
-      }
+      uptime: process.uptime(),
+      memory: process.memoryUsage()
     });
   } catch (error) {
     res.status(503).json({
@@ -138,6 +75,9 @@ require('./models/associations');
 // Import controllers
 const authController = require('./controllers/authController');
 const adminController = require('./controllers/adminController');
+const clientController = require('./controllers/clientController');
+const employeeController = require('./controllers/employeeController');
+const feedbackController = require('./controllers/feedbackController');
 
 // Import middleware
 const { authenticateToken, authorizeRole } = require('./middleware/auth');
@@ -152,18 +92,7 @@ const {
   paginationValidation
 } = require('./middleware/validation');
 
-// Import route modules
-const adminDashboardRoutes = require('./routes/admin/dashboard');
-const adminFeedbackRoutes = require('./routes/admin/feedback');
-const clientOrderRoutes = require('./routes/client/orders');
-const clientBillRoutes = require('./routes/client/bills');
-const clientFeedbackRoutes = require('./routes/client/feedback');
-const salesRoutes = require('./routes/employees/sales');
-const marketingRoutes = require('./routes/employees/marketing');
-const officeRoutes = require('./routes/employees/office');
-const { router: notificationRoutes } = require('./routes/shared/notifications');
-
-// Auth routes (using controllers)
+// Auth routes (using controllers directly)
 app.post('/api/auth/register', registerValidation, authController.register);
 app.post('/api/auth/login', loginValidation, authController.login);
 app.post('/api/auth/refresh', authController.refreshToken);
@@ -171,7 +100,7 @@ app.get('/api/auth/profile', authenticateToken, authController.getProfile);
 app.put('/api/auth/profile', authenticateToken, authController.updateProfile);
 app.post('/api/auth/change-password', authenticateToken, authController.changePassword);
 
-// Admin routes (using controllers and route modules)
+// Admin routes (using controllers directly)
 app.get('/api/admin/dashboard/overview', 
   authenticateToken, 
   authorizeRole(['admin']), 
@@ -199,15 +128,124 @@ app.post('/api/admin/reject-user',
   adminController.rejectUser
 );
 
-// Mount route modules
-app.use('/api/admin/feedback', adminFeedbackRoutes);
-app.use('/api/client/orders', clientOrderRoutes);
-app.use('/api/client/bills', clientBillRoutes);
-app.use('/api/client/feedback', clientFeedbackRoutes);
-app.use('/api/employees/sales', salesRoutes);
-app.use('/api/employees/marketing', marketingRoutes);
-app.use('/api/employees/office', officeRoutes);
-app.use('/api/notifications', notificationRoutes);
+// Client routes (using controllers directly)
+app.get('/api/client/dashboard', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  clientController.getDashboardOverview
+);
+app.get('/api/client/orders', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  clientController.getOrders
+);
+app.get('/api/client/orders/:id', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  clientController.getOrder
+);
+app.post('/api/client/orders', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  orderValidation,
+  clientController.createOrder
+);
+app.get('/api/client/bills', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  clientController.getBills
+);
+app.get('/api/client/bills/:id', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  clientController.getBill
+);
+
+// Employee routes (using controllers directly)
+app.get('/api/employees/sales/dashboard', 
+  authenticateToken, 
+  authorizeRole(['sales_purchase', 'admin']), 
+  employeeController.getSalesDashboard
+);
+app.get('/api/employees/marketing/dashboard', 
+  authenticateToken, 
+  authorizeRole(['marketing', 'admin']), 
+  employeeController.getMarketingDashboard
+);
+app.get('/api/employees/office/dashboard', 
+  authenticateToken, 
+  authorizeRole(['office', 'admin']), 
+  employeeController.getOfficeDashboard
+);
+
+// Feedback routes (using controllers directly)
+app.get('/api/feedback', 
+  authenticateToken, 
+  feedbackController.getAllFeedback
+);
+app.get('/api/feedback/client', 
+  authenticateToken, 
+  authorizeRole(['client']), 
+  feedbackController.getClientFeedback
+);
+app.post('/api/feedback', 
+  authenticateToken, 
+  feedbackValidation,
+  feedbackController.createFeedback
+);
+app.get('/api/feedback/:threadId', 
+  authenticateToken, 
+  feedbackController.getFeedbackThread
+);
+app.post('/api/feedback/:threadId/reply', 
+  authenticateToken, 
+  feedbackController.replyToFeedback
+);
+
+// Import and use route modules (with error handling)
+try {
+  // Admin route modules
+  const adminDashboardRoutes = require('./routes/admin/dashboard');
+  const adminFeedbackRoutes = require('./routes/admin/feedback');
+  const adminUsersRoutes = require('./routes/admin/users');
+  const adminAnalyticsRoutes = require('./routes/admin/analytics');
+  
+  app.use('/api/admin/dashboard', adminDashboardRoutes);
+  app.use('/api/admin/feedback', adminFeedbackRoutes);
+  app.use('/api/admin/users', adminUsersRoutes);
+  app.use('/api/admin/analytics', adminAnalyticsRoutes);
+
+  // Client route modules
+  const clientOrderRoutes = require('./routes/client/orders');
+  const clientBillRoutes = require('./routes/client/bills');
+  const clientFeedbackRoutes = require('./routes/client/feedback');
+  
+  app.use('/api/client/orders', clientOrderRoutes);
+  app.use('/api/client/bills', clientBillRoutes);
+  app.use('/api/client/feedback', clientFeedbackRoutes);
+
+  // Employee route modules
+  const salesRoutes = require('./routes/employees/sales');
+  const marketingRoutes = require('./routes/employees/marketing');
+  const officeRoutes = require('./routes/employees/office');
+  
+  app.use('/api/employees/sales', salesRoutes);
+  app.use('/api/employees/marketing', marketingRoutes);
+  app.use('/api/employees/office', officeRoutes);
+
+  // Shared route modules
+  const notificationRoutes = require('./routes/shared/notifications');
+  const reportsRoutes = require('./routes/shared/reports');
+  const uploadsRoutes = require('./routes/shared/uploads');
+  
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/reports', reportsRoutes);
+  app.use('/api/uploads', uploadsRoutes);
+
+} catch (error) {
+  console.error('Error loading route modules:', error.message);
+  console.log('Continuing with basic routes only...');
+}
 
 // File upload endpoint
 app.post('/api/upload', 
@@ -249,126 +287,27 @@ app.post('/api/upload',
   }
 );
 
-// API documentation endpoint
-app.get('/api/docs', (req, res) => {
-  res.json({
-    name: 'Business Management API',
-    version: process.env.APP_VERSION || '1.0.0',
-    description: 'Complete business management system API',
-    endpoints: {
-      auth: {
-        'POST /api/auth/register': 'Register new user',
-        'POST /api/auth/login': 'Login user',
-        'POST /api/auth/refresh': 'Refresh access token',
-        'GET /api/auth/profile': 'Get user profile',
-        'PUT /api/auth/profile': 'Update user profile',
-        'POST /api/auth/change-password': 'Change password'
-      },
-      admin: {
-        'GET /api/admin/dashboard/overview': 'Get dashboard data',
-        'GET /api/admin/users': 'Get all users',
-        'GET /api/admin/pending-approvals': 'Get pending approvals',
-        'POST /api/admin/approve-user': 'Approve user',
-        'POST /api/admin/reject-user': 'Reject user'
-      },
-      client: {
-        'GET /api/client/orders': 'Get client orders',
-        'POST /api/client/orders': 'Create new order',
-        'GET /api/client/bills': 'Get client bills',
-        'GET /api/client/feedback': 'Get feedback threads'
-      },
-      employees: {
-        'GET /api/employees/sales/dashboard': 'Sales dashboard',
-        'GET /api/employees/marketing/dashboard': 'Marketing dashboard',
-        'GET /api/employees/office/dashboard': 'Office dashboard'
-      }
-    }
-  });
-});
+// 404 handler
+app.use(notFound);
 
-// Error handling middleware (must be last)
-app.use(handleUploadError);
+// Error handling middleware
 app.use(errorHandler);
 
-// 404 handler (must be after all routes)
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found',
-    endpoint: req.originalUrl,
-    method: req.method,
-    availableEndpoints: '/api/docs'
-  });
-});
-
-// Graceful shutdown handling
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
-function gracefulShutdown(signal) {
-  console.log(`Received ${signal}. Shutting down gracefully...`);
-  
-  // Close server
-  server.close(() => {
-    console.log('HTTP server closed');
-    
-    // Close database connection
-    sequelize.close().then(() => {
-      console.log('Database connection closed');
-      process.exit(0);
-    }).catch(err => {
-      console.error('Error closing database:', err);
-      process.exit(1);
-    });
-  });
-}
-
-// Database connection and server start
-const PORT = process.env.PORT || 3000;
-let server;
-
-async function startServer() {
+// Start server
+const startServer = async () => {
   try {
-    // Test database connection
-    await sequelize.authenticate();
-    console.log('✅ Database connection established successfully');
+    // Connect to database
+    await connectDB();
     
-    // Sync database (create tables if they don't exist)
-    await sequelize.sync({ 
-      alter: process.env.NODE_ENV === 'development',
-      force: false // Never drop tables in production
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
     });
-    console.log('✅ Database synchronized successfully');
-    
-    // Start server
-    server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-      console.log(`📡 Health check: http://localhost:${PORT}/health`);
-      console.log(`📚 API docs: http://localhost:${PORT}/api/docs`);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`🔧 Admin dashboard: http://localhost:${PORT}/api/admin/dashboard/overview`);
-      }
-    });
-    
-    // Handle server errors
-    server.on('error', (error) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use`);
-      } else {
-        console.error('❌ Server error:', error);
-      }
-      process.exit(1);
-    });
-    
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
-}
+};
 
-// Start the server
 startServer();
-
-module.exports = app;

@@ -8,13 +8,8 @@ const Campaign = sequelize.define('Campaign', {
     primaryKey: true,
     autoIncrement: true
   },
-  campaign_id: {
-    type: DataTypes.STRING(50),
-    unique: true,
-    allowNull: false
-  },
   name: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.STRING(100),
     allowNull: false
   },
   description: {
@@ -22,13 +17,34 @@ const Campaign = sequelize.define('Campaign', {
     allowNull: true
   },
   type: {
-    type: DataTypes.ENUM('field', 'digital', 'email', 'sms', 'social'),
-    allowNull: false,
-    defaultValue: 'field'
+    type: DataTypes.ENUM('email', 'social_media', 'ppc', 'content', 'event', 'other'),
+    defaultValue: 'other'
   },
   status: {
     type: DataTypes.ENUM('draft', 'active', 'paused', 'completed', 'cancelled'),
     defaultValue: 'draft'
+  },
+  budget: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 0.00
+  },
+  spent_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00
+  },
+  target_audience: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  start_date: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  end_date: {
+    type: DataTypes.DATE,
+    allowNull: true
   },
   created_by: {
     type: DataTypes.INTEGER,
@@ -38,51 +54,38 @@ const Campaign = sequelize.define('Campaign', {
       key: 'id'
     }
   },
-  start_date: {
-    type: DataTypes.DATEONLY,
-    allowNull: true
-  },
-  end_date: {
-    type: DataTypes.DATEONLY,
-    allowNull: true
-  },
-  budget: {
-    type: DataTypes.DECIMAL(12, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  target_audience: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  territory: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  goals: {
-    type: DataTypes.JSON,
-    allowNull: true
-  },
   metrics: {
     type: DataTypes.JSON,
-    allowNull: true,
     defaultValue: {
-      leads_generated: 0,
+      impressions: 0,
+      clicks: 0,
       conversions: 0,
-      reach: 0,
-      engagement: 0
+      leads_generated: 0,
+      cost_per_click: 0,
+      conversion_rate: 0
     }
+  },
+  tags: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  attachments: {
+    type: DataTypes.JSON,
+    defaultValue: []
   }
 }, {
   tableName: 'campaigns',
   timestamps: true,
   underscored: true,
-  hooks: {
-    beforeCreate: (campaign) => {
-      if (!campaign.campaign_id) {
-        campaign.campaign_id = `CAMP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  validate: {
+    endDateAfterStartDate() {
+      if (this.start_date && this.end_date && this.end_date <= this.start_date) {
+        throw new Error('End date must be after start date');
+      }
+    },
+    budgetLimit() {
+      if (this.budget && this.spent_amount > this.budget) {
+        throw new Error('Spent amount cannot exceed budget');
       }
     }
   }

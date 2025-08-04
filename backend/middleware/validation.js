@@ -1,213 +1,119 @@
 // backend/middleware/validation.js - Validation middleware
 const { body, param, query } = require('express-validator');
 
-// Auth validations
+// Auth validation
 const registerValidation = [
-  body('fullname')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Full name must be between 2-100 characters'),
-  
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Valid email address required'),
-  
-  body('phone')
-    .matches(/^\d{10}$/)
-    .withMessage('Phone number must be exactly 10 digits'),
-  
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters'),
-  
-  body('role')
-    .optional()
-    .isIn(['client', 'sales_purchase', 'marketing', 'office'])
-    .withMessage('Invalid role'),
-  
-  body('department')
-    .optional()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Department name too long'),
-  
-  body('employee_id')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('Employee ID too long')
+  body('fullname').notEmpty().trim().isLength({ min: 2, max: 100 }).withMessage('Full name must be 2-100 characters'),
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
+  body('role').optional().isIn(['client', 'sales_purchase', 'marketing', 'office', 'admin']).withMessage('Invalid role')
 ];
 
 const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Valid email address required'),
-  
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required')
 ];
 
-// Order validations
+// Order validation
 const orderValidation = [
-  body('product_name')
-    .trim()
-    .isLength({ min: 1, max: 255 })
-    .withMessage('Product name is required'),
-  
-  body('quantity')
-    .isFloat({ min: 0.01 })
-    .withMessage('Quantity must be greater than 0'),
-  
-  body('unit_price')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Unit price must be non-negative'),
-  
-  body('discount')
-    .optional()
-    .isFloat({ min: 0, max: 100 })
-    .withMessage('Discount must be between 0-100%'),
-  
-  body('description')
-    .optional()
-    .trim()
-    .isLength({ max: 1000 })
-    .withMessage('Description too long')
+  body('client_id').optional().isInt({ min: 1 }).withMessage('Valid client ID required'),
+  body('products').isArray({ min: 1 }).withMessage('At least one product is required'),
+  body('products.*.name').notEmpty().trim().withMessage('Product name is required'),
+  body('products.*.quantity').isInt({ min: 1 }).withMessage('Valid quantity required'),
+  body('products.*.unit_price').isFloat({ min: 0 }).withMessage('Valid unit price required'),
+  body('delivery_date').optional().isISO8601().withMessage('Valid delivery date required'),
+  body('notes').optional().trim().isLength({ max: 1000 }).withMessage('Notes too long')
 ];
 
-// Customer validations
+// Customer validation  
 const customerValidation = [
-  body('customerName')
-    .trim()
-    .isLength({ min: 2, max: 255 })
-    .withMessage('Customer name is required'),
-  
-  body('phoneNumber')
-    .matches(/^\d{10}$/)
-    .withMessage('Phone number must be exactly 10 digits'),
-  
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Valid email address required'),
-  
-  body('address')
-    .trim()
-    .isLength({ min: 5, max: 500 })
-    .withMessage('Address must be between 5-500 characters')
+  body('name').notEmpty().trim().isLength({ min: 2, max: 100 }).withMessage('Customer name must be 2-100 characters'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
+  body('address').optional().trim().isLength({ max: 500 }).withMessage('Address too long'),
+  body('company').optional().trim().isLength({ max: 100 }).withMessage('Company name too long')
 ];
 
-// Feedback validations
+// Bill validation
+const billValidation = [
+  body('order_id').optional().isInt({ min: 1 }).withMessage('Valid order ID required'),
+  body('client_id').optional().isInt({ min: 1 }).withMessage('Valid client ID required'),
+  body('items').isArray({ min: 1 }).withMessage('At least one item is required'),
+  body('items.*.description').notEmpty().trim().withMessage('Item description is required'),
+  body('items.*.quantity').isInt({ min: 1 }).withMessage('Valid quantity required'),
+  body('items.*.unit_price').isFloat({ min: 0 }).withMessage('Valid unit price required'),
+  body('tax_amount').optional().isFloat({ min: 0 }).withMessage('Valid tax amount required'),
+  body('discount_amount').optional().isFloat({ min: 0 }).withMessage('Valid discount amount required'),
+  body('due_date').optional().isISO8601().withMessage('Valid due date required')
+];
+
+// Feedback validation
 const feedbackValidation = [
-  body('subject')
-    .trim()
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Subject must be between 3-255 characters'),
-  
-  body('message')
-    .trim()
-    .isLength({ min: 10, max: 5000 })
-    .withMessage('Message must be between 10-5000 characters'),
-  
-  body('category')
-    .optional()
-    .isIn(['general', 'complaint', 'suggestion', 'support'])
-    .withMessage('Invalid category'),
-  
-  body('priority')
-    .optional()
-    .isIn(['low', 'medium', 'high'])
-    .withMessage('Invalid priority')
+  body('subject').notEmpty().trim().isLength({ min: 5, max: 200 }).withMessage('Subject must be 5-200 characters'),
+  body('message').notEmpty().trim().isLength({ min: 10, max: 2000 }).withMessage('Message must be 10-2000 characters'),
+  body('category').optional().isIn(['general', 'complaint', 'suggestion', 'support']).withMessage('Invalid category'),
+  body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority')
 ];
 
-// Campaign validations
+// Campaign validation
 const campaignValidation = [
-  body('name')
-    .trim()
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Campaign name must be between 3-255 characters'),
-  
-  body('type')
-    .isIn(['field', 'digital', 'email', 'sms', 'social'])
-    .withMessage('Invalid campaign type'),
-  
-  body('budget')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Budget must be non-negative'),
-  
-  body('start_date')
-    .optional()
-    .isDate()
-    .withMessage('Invalid start date'),
-  
-  body('end_date')
-    .optional()
-    .isDate()
-    .withMessage('Invalid end date')
+  body('name').notEmpty().trim().isLength({ min: 3, max: 100 }).withMessage('Campaign name must be 3-100 characters'),
+  body('description').optional().trim().isLength({ max: 1000 }).withMessage('Description too long'),
+  body('budget').optional().isFloat({ min: 0 }).withMessage('Valid budget required'),
+  body('start_date').optional().isISO8601().withMessage('Valid start date required'),
+  body('end_date').optional().isISO8601().withMessage('Valid end date required'),
+  body('target_audience').optional().trim().isLength({ max: 500 }).withMessage('Target audience description too long')
 ];
 
-// Lead validations
+// Lead validation
 const leadValidation = [
-  body('name')
-    .trim()
-    .isLength({ min: 2, max: 255 })
-    .withMessage('Lead name is required'),
-  
-  body('contact')
-    .matches(/^\d{10,15}$/)
-    .withMessage('Valid phone number required'),
-  
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Valid email address required'),
-  
-  body('source')
-    .optional()
-    .isIn(['field', 'website', 'referral', 'social', 'email', 'phone'])
-    .withMessage('Invalid lead source')
+  body('name').notEmpty().trim().isLength({ min: 2, max: 100 }).withMessage('Lead name must be 2-100 characters'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
+  body('company').optional().trim().isLength({ max: 100 }).withMessage('Company name too long'),
+  body('source').optional().isIn(['website', 'social_media', 'referral', 'cold_call', 'email', 'other']).withMessage('Invalid source'),
+  body('status').optional().isIn(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost']).withMessage('Invalid status'),
+  body('notes').optional().trim().isLength({ max: 1000 }).withMessage('Notes too long')
 ];
 
-// Task validations
+// Task validation
 const taskValidation = [
-  body('title')
-    .trim()
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Task title must be between 3-255 characters'),
-  
-  body('priority')
-    .optional()
-    .isIn(['low', 'medium', 'high', 'urgent'])
-    .withMessage('Invalid priority'),
-  
-  body('due_date')
-    .optional()
-    .isDate()
-    .withMessage('Invalid due date')
+  body('title').notEmpty().trim().isLength({ min: 3, max: 200 }).withMessage('Task title must be 3-200 characters'),
+  body('description').optional().trim().isLength({ max: 2000 }).withMessage('Description too long'),
+  body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Invalid priority'),
+  body('due_date').optional().isISO8601().withMessage('Valid due date required'),
+  body('assigned_to').optional().isInt({ min: 1 }).withMessage('Valid assignee ID required'),
+  body('category').optional().trim().isLength({ max: 50 }).withMessage('Category too long')
 ];
 
-// Parameter validations
+// Document validation
+const documentValidation = [
+  body('title').notEmpty().trim().isLength({ min: 3, max: 200 }).withMessage('Document title must be 3-200 characters'),
+  body('description').optional().trim().isLength({ max: 1000 }).withMessage('Description too long'),
+  body('category').optional().isIn(['contract', 'invoice', 'report', 'policy', 'other']).withMessage('Invalid category'),
+  body('tags').optional().isArray().withMessage('Tags must be an array'),
+  body('is_confidential').optional().isBoolean().withMessage('Confidential flag must be boolean')
+];
+
+// Generic validations
 const idValidation = [
-  param('id')
-    .isInt({ min: 1 })
-    .withMessage('Valid ID required')
+  param('id').isInt({ min: 1 }).withMessage('Valid ID required')
 ];
 
-// Query validations
 const paginationValidation = [
-  query('page')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1-100')
+  query('page').optional().isInt({ min: 1 }).withMessage('Valid page number required'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Valid limit required (1-100)'),
+  query('sort').optional().isIn(['asc', 'desc']).withMessage('Sort must be asc or desc'),
+  query('sortBy').optional().trim().isLength({ min: 1, max: 50 }).withMessage('Sort field required')
+];
+
+const searchValidation = [
+  query('q').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be 1-100 characters'),
+  query('category').optional().trim().isLength({ max: 50 }).withMessage('Category too long'),
+  query('status').optional().trim().isLength({ max: 50 }).withMessage('Status too long'),
+  query('from_date').optional().isISO8601().withMessage('Valid from date required'),
+  query('to_date').optional().isISO8601().withMessage('Valid to date required')
 ];
 
 module.exports = {
@@ -215,10 +121,13 @@ module.exports = {
   loginValidation,
   orderValidation,
   customerValidation,
+  billValidation,
   feedbackValidation,
   campaignValidation,
   leadValidation,
   taskValidation,
+  documentValidation,
   idValidation,
-  paginationValidation
+  paginationValidation,
+  searchValidation
 };

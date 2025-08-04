@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 // backend/routes/admin/dashboard.js - Admin dashboard
->>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 const express = require('express');
 const { Op } = require('sequelize');
 const User = require('../../models/User');

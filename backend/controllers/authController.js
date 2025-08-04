@@ -1,32 +1,12 @@
 // backend/controllers/authController.js - Authentication controller
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Op } = require('sequelize');
-const User = require('../models/User');
 const { validationResult } = require('express-validator');
+const User = require('../models/User');
+const jwtConfig = require('../config/jwt');
+const emailService = require('../services/emailService');
 
 class AuthController {
-  // Generate JWT tokens
-  generateTokens(user) {
-    const payload = {
-      id: user.id,
-      user_id: user.user_id,
-      email: user.email,
-      role: user.role,
-      status: user.status
-    };
-
-    const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { 
-      expiresIn: '15m' 
-    });
-    
-    const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { 
-      expiresIn: '7d' 
-    });
-
-    return { accessToken, refreshToken };
-  }
-
   // Register new user
   async register(req, res) {
     try {
@@ -39,46 +19,51 @@ class AuthController {
         });
       }
 
-      const { fullname, email, phone, password, role, department, employee_id } = req.body;
+      const { fullname, email, password, phone, role = 'client' } = req.body;
 
       // Check if user already exists
-      const existingUser = await User.findOne({
-        where: {
-          [Op.or]: [{ email }, { phone }]
-        }
-      });
-
+      const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
         return res.status(409).json({
           success: false,
-          message: 'User already exists with this email or phone'
+          message: 'User with this email already exists'
         });
       }
 
-      // Create user
-      const userData = {
-        fullname,
-        email: email.toLowerCase(),
-        phone,
-        password_hash: password,
-        role,
-        department,
-        employee_id,
-        status: ['sales_purchase', 'marketing', 'office'].includes(role) ? 'pending' : 'approved'
-      };
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 12);
 
-      const user = await User.create(userData);
-      const tokens = this.generateTokens(user);
+      // Determine if approval is required
+      const approval_required = ['sales_purchase', 'marketing', 'office'].includes(role);
+
+      // Create user
+      const user = await User.create({
+        fullname,
+        email,
+        password: hashedPassword,
+        phone,
+        role,
+        status: approval_required ? 'pending' : 'active',
+        approval_required
+      });
+
+      // Send welcome email
+      await emailService.sendWelcomeEmail(user);
 
       res.status(201).json({
         success: true,
-        message: user.approval_required ? 
-          'Registration successful. Awaiting admin approval.' : 
-          'Registration successful',
+        message: approval_required 
+          ? 'Registration successful. Your account is pending admin approval.'
+          : 'Registration successful. You can now log in.',
         data: {
-          user: user.toJSON(),
-          tokens,
-          requiresApproval: user.approval_required
+          user: {
+            id: user.id,
+            fullname: user.fullname,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            status: user.status
+          }
         }
       });
 
@@ -87,7 +72,7 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: 'Registration failed',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }
@@ -107,10 +92,7 @@ class AuthController {
       const { email, password } = req.body;
 
       // Find user
-      const user = await User.findOne({ 
-        where: { email: email.toLowerCase() } 
-      });
-
+      const user = await User.findOne({ where: { email } });
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -119,7 +101,7 @@ class AuthController {
       }
 
       // Check password
-      const isValidPassword = await user.comparePassword(password);
+      const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
@@ -127,27 +109,53 @@ class AuthController {
         });
       }
 
-      // Check if user is approved (for employee roles)
-      if (user.approval_required && user.status !== 'approved') {
+      // Check if user is active
+      if (user.status !== 'active') {
+        let message = 'Account is not active';
+        if (user.status === 'pending') {
+          message = 'Account is pending admin approval';
+        } else if (user.status === 'suspended') {
+          message = 'Account has been suspended';
+        }
+        
         return res.status(403).json({
           success: false,
-          message: 'Account pending approval',
-          data: { status: user.status }
+          message
         });
       }
 
+      // Generate tokens
+      const accessToken = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        jwtConfig.access.secret,
+        { expiresIn: jwtConfig.access.expiresIn }
+      );
+
+      const refreshToken = jwt.sign(
+        { userId: user.id },
+        jwtConfig.refresh.secret,
+        { expiresIn: jwtConfig.refresh.expiresIn }
+      );
+
       // Update last login
       await user.update({ last_login: new Date() });
-
-      // Generate tokens
-      const tokens = this.generateTokens(user);
 
       res.json({
         success: true,
         message: 'Login successful',
         data: {
-          user: user.toJSON(),
-          tokens
+          user: {
+            id: user.id,
+            fullname: user.fullname,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            status: user.status
+          },
+          tokens: {
+            accessToken,
+            refreshToken
+          }
         }
       });
 
@@ -156,7 +164,7 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: 'Login failed',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }
@@ -165,7 +173,7 @@ class AuthController {
   async refreshToken(req, res) {
     try {
       const { refreshToken } = req.body;
-      
+
       if (!refreshToken) {
         return res.status(401).json({
           success: false,
@@ -173,24 +181,44 @@ class AuthController {
         });
       }
 
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-      const user = await User.findByPk(decoded.id);
-
-      if (!user) {
+      // Verify refresh token
+      const decoded = jwt.verify(refreshToken, jwtConfig.refresh.secret);
+      
+      // Find user
+      const user = await User.findByPk(decoded.userId);
+      if (!user || user.status !== 'active') {
         return res.status(401).json({
           success: false,
           message: 'Invalid refresh token'
         });
       }
 
-      const tokens = this.generateTokens(user);
+      // Generate new access token
+      const accessToken = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        jwtConfig.access.secret,
+        { expiresIn: jwtConfig.access.expiresIn }
+      );
+
+      // Generate new refresh token
+      const newRefreshToken = jwt.sign(
+        { userId: user.id },
+        jwtConfig.refresh.secret,
+        { expiresIn: jwtConfig.refresh.expiresIn }
+      );
 
       res.json({
         success: true,
-        data: { tokens }
+        data: {
+          tokens: {
+            accessToken,
+            refreshToken: newRefreshToken
+          }
+        }
       });
 
     } catch (error) {
+      console.error('Token refresh error:', error);
       res.status(401).json({
         success: false,
         message: 'Invalid refresh token'
@@ -198,11 +226,11 @@ class AuthController {
     }
   }
 
-  // Get current user profile
+  // Get user profile
   async getProfile(req, res) {
     try {
       const user = await User.findByPk(req.user.id, {
-        attributes: { exclude: ['password_hash'] }
+        attributes: { exclude: ['password'] }
       });
 
       if (!user) {
@@ -214,15 +242,14 @@ class AuthController {
 
       res.json({
         success: true,
-        data: user
+        data: { user }
       });
 
     } catch (error) {
       console.error('Get profile error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to get profile',
-        error: error.message
+        message: 'Failed to fetch profile'
       });
     }
   }
@@ -230,8 +257,9 @@ class AuthController {
   // Update user profile
   async updateProfile(req, res) {
     try {
-      const user = await User.findByPk(req.user.id);
+      const { fullname, phone } = req.body;
       
+      const user = await User.findByPk(req.user.id);
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -239,30 +267,27 @@ class AuthController {
         });
       }
 
-      // Don't allow updating sensitive fields
-      const allowedFields = ['fullname', 'phone', 'preferences'];
-      const updateData = {};
-      
-      allowedFields.forEach(field => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      });
-
-      await user.update(updateData);
+      await user.update({ fullname, phone });
 
       res.json({
         success: true,
         message: 'Profile updated successfully',
-        data: user.toJSON()
+        data: {
+          user: {
+            id: user.id,
+            fullname: user.fullname,
+            email: user.email,
+            phone: user.phone,
+            role: user.role
+          }
+        }
       });
 
     } catch (error) {
       console.error('Update profile error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to update profile',
-        error: error.message
+        message: 'Failed to update profile'
       });
     }
   }
@@ -271,16 +296,8 @@ class AuthController {
   async changePassword(req, res) {
     try {
       const { currentPassword, newPassword } = req.body;
-      
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password and new password are required'
-        });
-      }
 
       const user = await User.findByPk(req.user.id);
-      
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -289,7 +306,7 @@ class AuthController {
       }
 
       // Verify current password
-      const isValidPassword = await user.comparePassword(currentPassword);
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
       if (!isValidPassword) {
         return res.status(400).json({
           success: false,
@@ -297,8 +314,9 @@ class AuthController {
         });
       }
 
-      // Update password
-      await user.update({ password_hash: newPassword });
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await user.update({ password: hashedPassword });
 
       res.json({
         success: true,
@@ -309,8 +327,7 @@ class AuthController {
       console.error('Change password error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to change password',
-        error: error.message
+        message: 'Failed to change password'
       });
     }
   }
