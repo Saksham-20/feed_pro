@@ -1,123 +1,107 @@
-import { Alert } from 'react-native';
-import { ERROR_MESSAGES } from './constants';
-
-export const formatCurrency = (amount, currency = '₹') => {
-  if (!amount && amount !== 0) return `${currency}0`;
-  return `${currency}${Number(amount).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
+// src/utils/helpers.js
+export const formatCurrency = (amount, currency = 'INR') => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })}`;
+  }).format(amount);
 };
 
-export const formatDate = (date, format = 'DD/MM/YYYY') => {
-  if (!date) return '';
+export const formatDate = (date, format = 'short') => {
+  const dateObj = new Date(date);
   
-  const d = new Date(date);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  
-  switch (format) {
-    case 'DD/MM/YYYY':
-      return `${day}/${month}/${year}`;
-    case 'MM/DD/YYYY':
-      return `${month}/${day}/${year}`;
-    case 'YYYY-MM-DD':
-      return `${year}-${month}-${day}`;
-    default:
-      return d.toLocaleDateString();
-  }
+  const options = {
+    short: { day: '2-digit', month: 'short', year: 'numeric' },
+    long: { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    },
+    time: { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    },
+    datetime: { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    },
+  };
+
+  return dateObj.toLocaleDateString('en-IN', options[format] || options.short);
 };
 
-export const formatTime = (date) => {
-  if (!date) return '';
-  return new Date(date).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-export const formatDateTime = (date) => {
-  if (!date) return '';
-  return `${formatDate(date)} ${formatTime(date)}`;
-};
-
-export const getTimeAgo = (date) => {
-  if (!date) return '';
-  
+export const formatRelativeTime = (date) => {
   const now = new Date();
-  const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
-  
-  if (diffInSeconds < 60) return 'Just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-  
+  const dateObj = new Date(date);
+  const diffInSeconds = Math.floor((now - dateObj) / 1000);
+
+  if (diffInSeconds < 60) {
+    return 'Just now';
+  }
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  }
+
   return formatDate(date);
 };
 
-export const validateEmail = (email) => {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
-};
+export const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
 
-export const validatePhone = (phone) => {
-  const cleaned = phone.replace(/\D/g, '');
-  return cleaned.length === 10;
-};
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-export const validatePassword = (password) => {
-  return password.length >= 6;
-};
-
-export const generateRandomId = (prefix = '') => {
-  const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 1000);
-  return `${prefix}${timestamp}_${random}`;
-};
-
-export const capitalizeFirstLetter = (string) => {
-  if (!string) return '';
-  return string.charAt(0).toUpperCase() + string.slice(1);
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 export const truncateText = (text, maxLength = 100) => {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return `${text.substring(0, maxLength)}...`;
+  if (!text || text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
 };
 
-export const handleApiError = (error) => {
-  console.error('API Error:', error);
-  
-  if (!error.response) {
-    Alert.alert('Network Error', ERROR_MESSAGES.NETWORK_ERROR);
-    return ERROR_MESSAGES.NETWORK_ERROR;
-  }
-  
-  const { status, data } = error.response;
-  
-  switch (status) {
-    case 401:
-      return ERROR_MESSAGES.UNAUTHORIZED;
-    case 403:
-      return ERROR_MESSAGES.FORBIDDEN;
-    case 404:
-      return ERROR_MESSAGES.NOT_FOUND;
-    case 422:
-      return data.message || ERROR_MESSAGES.VALIDATION_ERROR;
-    case 500:
-      return ERROR_MESSAGES.SERVER_ERROR;
-    default:
-      return data.message || 'An unexpected error occurred';
-  }
+export const capitalizeFirst = (str) => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-export const debounce = (func, delay) => {
-  let timeoutId;
-  return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
+export const capitalizeWords = (str) => {
+  if (!str) return '';
+  return str.split(' ').map(capitalizeFirst).join(' ');
+};
+
+export const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+export const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
   };
 };
 
@@ -132,4 +116,63 @@ export const throttle = (func, limit) => {
       setTimeout(() => inThrottle = false, limit);
     }
   };
+};
+
+export const deepMerge = (target, source) => {
+  const output = Object.assign({}, target);
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target))
+          Object.assign(output, { [key]: source[key] });
+        else
+          output[key] = deepMerge(target[key], source[key]);
+      } else {
+        Object.assign(output, { [key]: source[key] });
+      }
+    });
+  }
+  return output;
+};
+
+const isObject = (item) => {
+  return item && typeof item === 'object' && !Array.isArray(item);
+};
+
+export const groupBy = (array, key) => {
+  return array.reduce((result, item) => {
+    const group = item[key];
+    if (!result[group]) {
+      result[group] = [];
+    }
+    result[group].push(item);
+    return result;
+  }, {});
+};
+
+export const sortBy = (array, key, direction = 'asc') => {
+  return [...array].sort((a, b) => {
+    const aVal = a[key];
+    const bVal = b[key];
+    
+    if (direction === 'desc') {
+      return bVal > aVal ? 1 : -1;
+    }
+    return aVal > bVal ? 1 : -1;
+  });
+};
+
+export const filterBy = (array, filters) => {
+  return array.filter(item => {
+    return Object.keys(filters).every(key => {
+      const filterValue = filters[key];
+      const itemValue = item[key];
+      
+      if (!filterValue) return true;
+      if (typeof filterValue === 'string') {
+        return itemValue.toLowerCase().includes(filterValue.toLowerCase());
+      }
+      return itemValue === filterValue;
+    });
+  });
 };

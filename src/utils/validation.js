@@ -1,5 +1,6 @@
+// src/utils/validation.js (Enhanced version)
 export const validateRequired = (value) => {
-  return value !== null && value !== undefined && value.toString().trim() !== '';
+  return value !== null && value !== undefined && value.toString().trim().length > 0;
 };
 
 export const validateEmail = (email) => {
@@ -8,19 +9,25 @@ export const validateEmail = (email) => {
 };
 
 export const validatePhone = (phone) => {
-  const cleaned = phone.replace(/\D/g, '');
-  return cleaned.length === 10;
+  const phoneRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+  return phoneRegex.test(phone.replace(/\s/g, ''));
 };
 
 export const validateNumber = (value) => {
-  return !isNaN(parseFloat(value)) && isFinite(value);
+  return !isNaN(value) && !isNaN(parseFloat(value));
 };
 
-export const validatePositiveNumber = (value) => {
-  return validateNumber(value) && parseFloat(value) > 0;
+export const validateInteger = (value) => {
+  return Number.isInteger(Number(value));
 };
 
-export const validateUrl = (url) => {
+export const validatePassword = (password) => {
+  // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+};
+
+export const validateURL = (url) => {
   try {
     new URL(url);
     return true;
@@ -29,9 +36,19 @@ export const validateUrl = (url) => {
   }
 };
 
-export const validateDate = (date) => {
-  const dateObj = new Date(date);
-  return dateObj instanceof Date && !isNaN(dateObj);
+export const validateGST = (gst) => {
+  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  return gstRegex.test(gst);
+};
+
+export const validatePAN = (pan) => {
+  const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  return panRegex.test(pan);
+};
+
+export const validatePincode = (pincode) => {
+  const pincodeRegex = /^[1-9][0-9]{5}$/;
+  return pincodeRegex.test(pincode);
 };
 
 export const validateDateRange = (startDate, endDate) => {
@@ -40,129 +57,25 @@ export const validateDateRange = (startDate, endDate) => {
   return start <= end;
 };
 
-export const validatePassword = (password) => {
-  return password.length >= 6;
+export const validateFileSize = (file, maxSizeInMB) => {
+  const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+  return file.size <= maxSizeInBytes;
 };
 
-export const validateStrongPassword = (password) => {
-  const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  return strongRegex.test(password);
+export const validateFileType = (file, allowedTypes) => {
+  const fileExtension = file.name.split('.').pop().toLowerCase();
+  return allowedTypes.includes(fileExtension);
 };
 
-export const validateGST = (gst) => {
-  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  return gstRegex.test(gst);
-};
-
-export const validatePincode = (pincode) => {
-  const pincodeRegex = /^[1-9][0-9]{5}$/;
-  return pincodeRegex.test(pincode);
-};
-
-// Validation rules object for forms
+// Validation rules for forms
 export const validationRules = {
   required: (value) => validateRequired(value) || 'This field is required',
   email: (value) => !value || validateEmail(value) || 'Please enter a valid email',
-  phone: (value) => !value || validatePhone(value) || 'Please enter a valid 10-digit phone number',
+  phone: (value) => !value || validatePhone(value) || 'Please enter a valid phone number',
   number: (value) => !value || validateNumber(value) || 'Please enter a valid number',
-  positiveNumber: (value) => !value || validatePositiveNumber(value) || 'Please enter a positive number',
-  password: (value) => !value || validatePassword(value) || 'Password must be at least 6 characters',
-  strongPassword: (value) => !value || validateStrongPassword(value) || 'Password must contain uppercase, lowercase, number and special character',
-  url: (value) => !value || validateUrl(value) || 'Please enter a valid URL',
-  date: (value) => !value || validateDate(value) || 'Please enter a valid date',
+  password: (value) => !value || validatePassword(value) || 'Password must be at least 8 characters with uppercase, lowercase, and number',
+  url: (value) => !value || validateURL(value) || 'Please enter a valid URL',
   gst: (value) => !value || validateGST(value) || 'Please enter a valid GST number',
+  pan: (value) => !value || validatePAN(value) || 'Please enter a valid PAN number',
   pincode: (value) => !value || validatePincode(value) || 'Please enter a valid PIN code',
-};
-
-// src/utils/permissions.js - Permission utilities
-import { USER_ROLES } from './constants';
-
-export const permissions = {
-  // Admin permissions
-  MANAGE_USERS: 'manage_users',
-  APPROVE_USERS: 'approve_users',
-  VIEW_ALL_DATA: 'view_all_data',
-  SYSTEM_SETTINGS: 'system_settings',
-  
-  // Sales permissions
-  MANAGE_CUSTOMERS: 'manage_customers',
-  CREATE_ORDERS: 'create_orders',
-  VIEW_SALES_DATA: 'view_sales_data',
-  
-  // Marketing permissions
-  MANAGE_CAMPAIGNS: 'manage_campaigns',
-  MANAGE_LEADS: 'manage_leads',
-  VIEW_MARKETING_DATA: 'view_marketing_data',
-  
-  // Office permissions
-  MANAGE_TASKS: 'manage_tasks',
-  MANAGE_DOCUMENTS: 'manage_documents',
-  GENERATE_REPORTS: 'generate_reports',
-  
-  // Client permissions
-  CREATE_CLIENT_ORDERS: 'create_client_orders',
-  VIEW_CLIENT_DATA: 'view_client_data',
-  SEND_FEEDBACK: 'send_feedback',
-};
-
-const rolePermissions = {
-  [USER_ROLES.ADMIN]: [
-    permissions.MANAGE_USERS,
-    permissions.APPROVE_USERS,
-    permissions.VIEW_ALL_DATA,
-    permissions.SYSTEM_SETTINGS,
-    permissions.MANAGE_CUSTOMERS,
-    permissions.CREATE_ORDERS,
-    permissions.VIEW_SALES_DATA,
-    permissions.MANAGE_CAMPAIGNS,
-    permissions.MANAGE_LEADS,
-    permissions.VIEW_MARKETING_DATA,
-    permissions.MANAGE_TASKS,
-    permissions.MANAGE_DOCUMENTS,
-    permissions.GENERATE_REPORTS,
-  ],
-  
-  [USER_ROLES.SALES_PURCHASE]: [
-    permissions.MANAGE_CUSTOMERS,
-    permissions.CREATE_ORDERS,
-    permissions.VIEW_SALES_DATA,
-  ],
-  
-  [USER_ROLES.MARKETING]: [
-    permissions.MANAGE_CAMPAIGNS,
-    permissions.MANAGE_LEADS,
-    permissions.VIEW_MARKETING_DATA,
-  ],
-  
-  [USER_ROLES.OFFICE]: [
-    permissions.MANAGE_TASKS,
-    permissions.MANAGE_DOCUMENTS,
-    permissions.GENERATE_REPORTS,
-  ],
-  
-  [USER_ROLES.CLIENT]: [
-    permissions.CREATE_CLIENT_ORDERS,
-    permissions.VIEW_CLIENT_DATA,
-    permissions.SEND_FEEDBACK,
-  ],
-};
-
-export const hasPermission = (userRole, permission) => {
-  return rolePermissions[userRole]?.includes(permission) || false;
-};
-
-export const hasAnyPermission = (userRole, permissionsList) => {
-  return permissionsList.some(permission => hasPermission(userRole, permission));
-};
-
-export const getUserPermissions = (userRole) => {
-  return rolePermissions[userRole] || [];
-};
-
-export const canAccessRoute = (userRole, routePermissions) => {
-  if (!routePermissions || routePermissions.length === 0) {
-    return true; // Public route
-  }
-  
-  return hasAnyPermission(userRole, routePermissions);
 };

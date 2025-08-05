@@ -15,7 +15,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import Button from '../components/common/Button';
-import Card from '../components/common/Card';
+import Card from '../components/common/Card.js';
 import Input from '../components/common/Input';
 import Icon from 'react-native-vector-icons/Feather';
 

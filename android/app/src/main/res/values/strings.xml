@@ -1,7 +1,3 @@
 <resources>
-<<<<<<< HEAD
-    <string name="app_name">BhaicharaPro</string>
-=======
     <string name="app_name">feed_pro</string>
->>>>>>> b803d9813bb287faf3b552db52b8254ec7447dfc
 </resources>

@@ -1,22 +1,42 @@
+// src/components/common/LoadingSpinner.js
 import React from 'react';
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  ActivityIndicator,
+  Text,
+  StyleSheet,
+  Modal,
+} from 'react-native';
 import { theme } from '../../styles/theme';
 
-const LoadingSpinner = ({ 
-  size = 'large', 
-  color = theme.colors.primary[500], 
-  text = 'Loading...', 
+const LoadingSpinner = ({
+  visible = true,
+  text = 'Loading...',
   overlay = false,
-  style 
+  size = 'large',
+  color = theme.colors.primary,
 }) => {
-  const containerStyle = [
-    styles.container,
-    overlay && styles.overlay,
-    style
-  ];
+  if (overlay) {
+    return (
+      <Modal
+        transparent
+        visible={visible}
+        animationType="fade"
+      >
+        <View style={styles.overlay}>
+          <View style={styles.container}>
+            <ActivityIndicator size={size} color={color} />
+            {text && <Text style={styles.text}>{text}</Text>}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  if (!visible) return null;
 
   return (
-    <View style={containerStyle}>
+    <View style={styles.container}>
       <ActivityIndicator size={size} color={color} />
       {text && <Text style={styles.text}>{text}</Text>}
     </View>
@@ -24,24 +44,23 @@ const LoadingSpinner = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    zIndex: 999,
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 120,
   },
   text: {
     marginTop: 12,
     fontSize: 16,
-    color: theme.colors.gray[600],
+    color: theme.colors.textPrimary,
     textAlign: 'center',
   },
 });

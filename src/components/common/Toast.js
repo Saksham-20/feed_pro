@@ -1,36 +1,33 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+// src/components/common/Toast.js
+import React, { useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Dimensions,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { theme } from '../../styles/theme';
 
-const Toast = ({ 
-  visible, 
-  message, 
-  type = 'info', 
-  duration = 3000, 
-  onHide,
-  position = 'top' 
+const { width } = Dimensions.get('window');
+
+const Toast = ({
+  visible,
+  message,
+  type = 'info',
+  duration = 3000,
+  onDismiss,
 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(-100)).current;
+  const translateY = new Animated.Value(-100);
 
   useEffect(() => {
     if (visible) {
-      // Show animation
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
 
-      // Auto hide
       const timer = setTimeout(() => {
         hideToast();
       }, duration);
@@ -40,72 +37,54 @@ const Toast = ({
   }, [visible]);
 
   const hideToast = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: position === 'top' ? -100 : 100,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      if (onHide) onHide();
+    Animated.timing(translateY, {
+      toValue: -100,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      onDismiss && onDismiss();
     });
   };
 
-  const getToastStyle = () => {
-    switch (type) {
-      case 'success':
-        return styles.success;
-      case 'error':
-        return styles.error;
-      case 'warning':
-        return styles.warning;
-      default:
-        return styles.info;
-    }
-  };
-
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return 'check-circle';
-      case 'error':
-        return 'x-circle';
-      case 'warning':
-        return 'alert-triangle';
-      default:
-        return 'info';
-    }
-  };
-
   if (!visible) return null;
+
+  const getToastConfig = () => {
+    switch (type) {
+      case 'success':
+        return {
+          backgroundColor: '#10B981',
+          icon: 'check-circle',
+        };
+      case 'error':
+        return {
+          backgroundColor: '#EF4444',
+          icon: 'alert-circle',
+        };
+      case 'warning':
+        return {
+          backgroundColor: '#F59E0B',
+          icon: 'alert-triangle',
+        };
+      default:
+        return {
+          backgroundColor: '#6366F1',
+          icon: 'info',
+        };
+    }
+  };
+
+  const config = getToastConfig();
 
   return (
     <Animated.View
       style={[
         styles.container,
-        position === 'bottom' ? styles.bottom : styles.top,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
+        { backgroundColor: config.backgroundColor },
+        { transform: [{ translateY }] },
       ]}
     >
-      <TouchableOpacity
-        style={[styles.toast, getToastStyle()]}
-        onPress={hideToast}
-        activeOpacity={0.9}
-      >
-        <Icon name={getIcon()} size={20} color="#FFFFFF" style={styles.icon} />
-        <Text style={styles.message}>{message}</Text>
-        <TouchableOpacity onPress={hideToast} style={styles.closeButton}>
-          <Icon name="x" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </TouchableOpacity>
+      <Icon name={config.icon} size={20} color="#FFFFFF" />
+      <Text style={styles.message}>{message}</Text>
     </Animated.View>
   );
 };
@@ -113,47 +92,29 @@ const Toast = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 20,
-    right: 20,
-    zIndex: 9999,
-  },
-  top: {
-    top: 60,
-  },
-  bottom: {
-    bottom: 60,
-  },
-  toast: {
+    top: 50,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    ...theme.shadows.lg,
-  },
-  success: {
-    backgroundColor: theme.colors.secondary[500],
-  },
-  error: {
-    backgroundColor: theme.colors.danger[500],
-  },
-  warning: {
-    backgroundColor: theme.colors.accent[500],
-  },
-  info: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  icon: {
-    marginRight: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   message: {
     flex: 1,
     fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '500',
-  },
-  closeButton: {
-    padding: 4,
-    marginLeft: 8,
+    marginLeft: 12,
   },
 });
 

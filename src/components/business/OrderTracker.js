@@ -1,157 +1,148 @@
+// src/components/business/OrderTracker.js
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import Card from '../common/Card';
 import { theme } from '../../styles/theme';
-import { ORDER_STATUS } from '../../utils/constants';
+import { formatDate } from '../../utils/helpers';
 
-const OrderTracker = ({ status, createdDate, expectedDelivery }) => {
-  const statusSteps = [
-    { key: ORDER_STATUS.PENDING, label: 'Order Placed', icon: 'file-text' },
-    { key: ORDER_STATUS.CONFIRMED, label: 'Confirmed', icon: 'check-circle' },
-    { key: ORDER_STATUS.PROCESSING, label: 'Processing', icon: 'clock' },
-    { key: ORDER_STATUS.SHIPPED, label: 'Shipped', icon: 'truck' },
-    { key: ORDER_STATUS.DELIVERED, label: 'Delivered', icon: 'package' },
-  ];
+const OrderTracker = ({ order }) => {
+  const getStatusSteps = () => {
+    const allSteps = [
+      { key: 'pending', label: 'Order Placed', icon: 'shopping-cart' },
+      { key: 'confirmed', label: 'Confirmed', icon: 'check-circle' },
+      { key: 'processing', label: 'Processing', icon: 'package' },
+      { key: 'shipped', label: 'Shipped', icon: 'truck' },
+      { key: 'delivered', label: 'Delivered', icon: 'home' },
+    ];
 
-  const getCurrentStepIndex = () => {
-    return statusSteps.findIndex(step => step.key === status);
+    const statusOrder = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+    const currentIndex = statusOrder.indexOf(order.status);
+
+    return allSteps.map((step, index) => ({
+      ...step,
+      completed: index <= currentIndex,
+      active: index === currentIndex,
+    }));
   };
 
-  const currentStepIndex = getCurrentStepIndex();
+  const steps = getStatusSteps();
 
-  const getStepStyle = (index) => {
-    if (index < currentStepIndex) {
-      return styles.stepCompleted;
-    } else if (index === currentStepIndex) {
-      return styles.stepActive;
-    } else {
-      return styles.stepPending;
-    }
-  };
+  const renderStep = (step, index) => {
+    const isLast = index === steps.length - 1;
 
-  const getLineStyle = (index) => {
-    if (index < currentStepIndex) {
-      return styles.lineCompleted;
-    } else {
-      return styles.linePending;
-    }
+    return (
+      <View key={step.key} style={styles.stepContainer}>
+        <View style={styles.stepIndicator}>
+          <View style={[
+            styles.stepIcon,
+            step.completed && styles.stepIconCompleted,
+            step.active && styles.stepIconActive,
+          ]}>
+            <Icon
+              name={step.icon}
+              size={20}
+              color={step.completed ? '#FFFFFF' : theme.colors.textTertiary}
+            />
+          </View>
+          {!isLast && (
+            <View style={[
+              styles.stepLine,
+              step.completed && styles.stepLineCompleted,
+            ]} />
+          )}
+        </View>
+        
+        <View style={styles.stepContent}>
+          <Text style={[
+            styles.stepLabel,
+            step.completed && styles.stepLabelCompleted,
+          ]}>
+            {step.label}
+          </Text>
+          {step.active && order.updated_at && (
+            <Text style={styles.stepTime}>
+              {formatDate(order.updated_at, 'datetime')}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Order Status</Text>
-      
-      <View style={styles.tracker}>
-        {statusSteps.map((step, index) => (
-          <View key={step.key} style={styles.stepContainer}>
-            <View style={styles.stepRow}>
-              <View style={[styles.stepIcon, getStepStyle(index)]}>
-                <Icon 
-                  name={step.icon} 
-                  size={16} 
-                  color={index <= currentStepIndex ? '#FFFFFF' : theme.colors.gray[400]} 
-                />
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={[
-                  styles.stepLabel,
-                  index <= currentStepIndex && styles.stepLabelActive
-                ]}>
-                  {step.label}
-                </Text>
-                {index === 0 && createdDate && (
-                  <Text style={styles.stepDate}>
-                    {new Date(createdDate).toLocaleDateString()}
-                  </Text>
-                )}
-                {index === statusSteps.length - 1 && expectedDelivery && (
-                  <Text style={styles.stepDate}>
-                    Expected: {new Date(expectedDelivery).toLocaleDateString()}
-                  </Text>
-                )}
-              </View>
-            </View>
-            
-            {index < statusSteps.length - 1 && (
-              <View style={[styles.stepLine, getLineStyle(index)]} />
-            )}
-          </View>
-        ))}
-      </View>
-    </View>
+    <Card style={styles.container}>
+      <Text style={styles.title}>Order Tracking</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {steps.map(renderStep)}
+      </ScrollView>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    ...theme.shadows.md,
+    margin: 16,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.gray[800],
-    marginBottom: 16,
-  },
-  tracker: {
-    paddingLeft: 8,
+    color: theme.colors.textPrimary,
+    marginBottom: 20,
   },
   stepContainer: {
-    position: 'relative',
-  },
-  stepRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  stepIndicator: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginRight: 16,
   },
   stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  stepCompleted: {
-    backgroundColor: theme.colors.secondary[500],
+  stepIconCompleted: {
+    backgroundColor: theme.colors.success,
   },
-  stepActive: {
-    backgroundColor: theme.colors.primary[500],
+  stepIconActive: {
+    backgroundColor: theme.colors.primary,
   },
-  stepPending: {
-    backgroundColor: theme.colors.gray[200],
+  stepLine: {
+    width: 2,
+    height: 32,
+    backgroundColor: '#E2E8F0',
+  },
+  stepLineCompleted: {
+    backgroundColor: theme.colors.success,
   },
   stepContent: {
     flex: 1,
+    paddingTop: 8,
   },
   stepLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme.colors.gray[600],
+    color: theme.colors.textTertiary,
   },
-  stepLabelActive: {
-    color: theme.colors.gray[800],
-    fontWeight: '600',
+  stepLabelCompleted: {
+    color: theme.colors.textPrimary,
   },
-  stepDate: {
-    fontSize: 12,
-    color: theme.colors.gray[500],
-    marginTop: 2,
-  },
-  stepLine: {
-    position: 'absolute',
-    left: 15,
-    top: 32,
-    width: 2,
-    height: 24,
-  },
-  lineCompleted: {
-    backgroundColor: theme.colors.secondary[500],
-  },
-  linePending: {
-    backgroundColor: theme.colors.gray[200],
+  stepTime: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
   },
 });
 

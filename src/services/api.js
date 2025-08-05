@@ -1,34 +1,36 @@
+// src/services/api.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG } from '../config/ApiConfig';
+import { STORAGE_KEYS, API_ENDPOINTS } from '../utils/constants';
 
-// Create axios instance
+// Base API configuration
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:3000' 
+  : 'https://your-production-api.com';
+
 const api = axios.create({
-  baseURL: API_CONFIG.BASE_URL,
-  timeout: API_CONFIG.TIMEOUT,
-  headers: API_CONFIG.HEADERS,
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    } catch (error) {
-      console.error('Error adding auth token:', error);
-      return config;
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for token refresh
+// Response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -38,28 +40,34 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
+        const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+        
         if (refreshToken) {
-          const response = await axios.post(
-            `${API_CONFIG.BASE_URL}/api/auth/refresh`,
-            { refreshToken }
-          );
+          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+            refreshToken,
+          });
 
           if (response.data.success) {
-            const { accessToken, refreshToken: newRefreshToken } = response.data.data.tokens;
+            const { accessToken, refreshToken: newRefreshToken } = response.data.data;
             
-            await AsyncStorage.setItem('accessToken', accessToken);
-            await AsyncStorage.setItem('refreshToken', newRefreshToken);
-            
+            await Promise.all([
+              AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken),
+              AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken),
+            ]);
+
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return api(originalRequest);
           }
         }
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError);
-        // Clear storage and redirect to login
-        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
-        // You might want to use navigation here to redirect to login
+        
+        // Clear stored tokens and redirect to login
+        await Promise.all([
+          AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
+          AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+          AsyncStorage.removeItem(STORAGE_KEYS.USER),
+        ]);
       }
     }
 

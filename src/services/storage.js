@@ -1,117 +1,110 @@
+// src/services/storage.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../utils/constants';
 
-class StorageService {
-  // Generic get/set methods
-  async get(key) {
+export const storageService = {
+  async setItem(key, value) {
     try {
-      const value = await AsyncStorage.getItem(key);
-      return value ? JSON.parse(value) : null;
+      const jsonValue = JSON.stringify(value);
+      await AsyncStorage.setItem(key, jsonValue);
+      return { success: true };
     } catch (error) {
-      console.error(`Error getting ${key}:`, error);
+      console.error('Storage setItem error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async getItem(key) {
+    try {
+      const jsonValue = await AsyncStorage.getItem(key);
+      return jsonValue != null ? JSON.parse(jsonValue) : null;
+    } catch (error) {
+      console.error('Storage getItem error:', error);
       return null;
     }
-  }
+  },
 
-  async set(key, value) {
-    try {
-      await AsyncStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      console.error(`Error setting ${key}:`, error);
-      return false;
-    }
-  }
-
-  async remove(key) {
+  async removeItem(key) {
     try {
       await AsyncStorage.removeItem(key);
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error(`Error removing ${key}:`, error);
-      return false;
+      console.error('Storage removeItem error:', error);
+      return { success: false, error: error.message };
     }
-  }
+  },
 
   async clear() {
     try {
       await AsyncStorage.clear();
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error('Error clearing storage:', error);
-      return false;
+      console.error('Storage clear error:', error);
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  // Specific methods for common data
-  async getUser() {
-    return await this.get('user');
-  }
-
-  async setUser(user) {
-    return await this.set('user', user);
-  }
-
-  async getTokens() {
-    const accessToken = await AsyncStorage.getItem('accessToken');
-    const refreshToken = await AsyncStorage.getItem('refreshToken');
-    return { accessToken, refreshToken };
-  }
-
-  async setTokens(tokens) {
-    try {
-      await AsyncStorage.setItem('accessToken', tokens.accessToken);
-      await AsyncStorage.setItem('refreshToken', tokens.refreshToken);
-      return true;
-    } catch (error) {
-      console.error('Error setting tokens:', error);
-      return false;
-    }
-  }
-
-  async clearAuthData() {
-    try {
-      await AsyncStorage.multiRemove(['user', 'accessToken', 'refreshToken']);
-      return true;
-    } catch (error) {
-      console.error('Error clearing auth data:', error);
-      return false;
-    }
-  }
-
-  // Cache management
-  async setCache(key, data, expiryMinutes = 60) {
-    const cacheData = {
-      data,
-      timestamp: Date.now(),
-      expiry: Date.now() + (expiryMinutes * 60 * 1000)
-    };
-    return await this.set(`cache_${key}`, cacheData);
-  }
-
-  async getCache(key) {
-    const cacheData = await this.get(`cache_${key}`);
-    
-    if (!cacheData) return null;
-    
-    if (Date.now() > cacheData.expiry) {
-      await this.remove(`cache_${key}`);
-      return null;
-    }
-    
-    return cacheData.data;
-  }
-
-  async clearCache() {
+  async getAllKeys() {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const cacheKeys = keys.filter(key => key.startsWith('cache_'));
-      await AsyncStorage.multiRemove(cacheKeys);
-      return true;
+      return { success: true, keys };
     } catch (error) {
-      console.error('Error clearing cache:', error);
-      return false;
+      console.error('Storage getAllKeys error:', error);
+      return { success: false, error: error.message };
     }
-  }
-}
+  },
 
-export default new StorageService();
+  // Cache with expiration
+  async setCachedItem(key, value, expirationMinutes = 60) {
+    try {
+      const expirationTime = Date.now() + (expirationMinutes * 60 * 1000);
+      const cachedData = {
+        data: value,
+        expiration: expirationTime,
+      };
+      
+      await this.setItem(`${STORAGE_KEYS.CACHE_PREFIX}${key}`, cachedData);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  async getCachedItem(key) {
+    try {
+      const cachedData = await this.getItem(`${STORAGE_KEYS.CACHE_PREFIX}${key}`);
+      
+      if (!cachedData) {
+        return null;
+      }
+
+      if (Date.now() > cachedData.expiration) {
+        await this.removeItem(`${STORAGE_KEYS.CACHE_PREFIX}${key}`);
+        return null;
+      }
+
+      return cachedData.data;
+    } catch (error) {
+      console.error('Get cached item error:', error);
+      return null;
+    }
+  },
+
+  async clearExpiredCache() {
+    try {
+      const { keys } = await this.getAllKeys();
+      const cacheKeys = keys.filter(key => key.startsWith(STORAGE_KEYS.CACHE_PREFIX));
+      
+      for (const key of cacheKeys) {
+        const cachedData = await this.getItem(key);
+        if (cachedData && Date.now() > cachedData.expiration) {
+          await this.removeItem(key);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+};

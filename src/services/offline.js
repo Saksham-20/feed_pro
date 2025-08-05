@@ -1,130 +1,115 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-netinfo/netinfo';
-import api from './api';
+// src/services/offline.js
+import NetInfo from '@react-native-community/netinfo';
+import { storageService } from './storage';
+import { STORAGE_KEYS } from '../utils/constants';
 
-class OfflineService {
-  constructor() {
-    this.isOnline = true;
-    this.syncQueue = [];
-    this.init();
-  }
-
-  init() {
-    // Monitor network status
-    NetInfo.addEventListener(state => {
-      const wasOffline = !this.isOnline;
-      this.isOnline = state.isConnected;
+export const offlineService = {
+  async addToSyncQueue(action) {
+    try {
+      const queue = await storageService.getItem(STORAGE_KEYS.SYNC_QUEUE) || [];
+      const queueItem = {
+        id: Date.now().toString(),
+        action,
+        timestamp: Date.now(),
+        attempts: 0,
+      };
       
-      if (wasOffline && this.isOnline) {
-        this.processSyncQueue();
-      }
-    });
-
-    // Load sync queue from storage
-    this.loadSyncQueue();
-  }
-
-  async loadSyncQueue() {
-    try {
-      const queue = await AsyncStorage.getItem('syncQueue');
-      this.syncQueue = queue ? JSON.parse(queue) : [];
+      queue.push(queueItem);
+      await storageService.setItem(STORAGE_KEYS.SYNC_QUEUE, queue);
+      
+      return { success: true, id: queueItem.id };
     } catch (error) {
-      console.error('Error loading sync queue:', error);
-      this.syncQueue = [];
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  async saveSyncQueue() {
+  async getSyncQueue() {
     try {
-      await AsyncStorage.setItem('syncQueue', JSON.stringify(this.syncQueue));
+      const queue = await storageService.getItem(STORAGE_KEYS.SYNC_QUEUE) || [];
+      return { success: true, queue };
     } catch (error) {
-      console.error('Error saving sync queue:', error);
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  async addToQueue(action, data, endpoint, method = 'POST') {
-    const queueItem = {
-      id: Date.now().toString(),
-      action,
-      data,
-      endpoint,
-      method,
-      timestamp: new Date().toISOString(),
-      retryCount: 0
-    };
-
-    this.syncQueue.push(queueItem);
-    await this.saveSyncQueue();
-
-    // Try to sync immediately if online
-    if (this.isOnline) {
-      this.processSyncQueue();
+  async removeFromSyncQueue(itemId) {
+    try {
+      const queue = await storageService.getItem(STORAGE_KEYS.SYNC_QUEUE) || [];
+      const updatedQueue = queue.filter(item => item.id !== itemId);
+      await storageService.setItem(STORAGE_KEYS.SYNC_QUEUE, updatedQueue);
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
-
-    return queueItem.id;
-  }
+  },
 
   async processSyncQueue() {
-    if (!this.isOnline || this.syncQueue.length === 0) return;
+    try {
+      const networkState = await NetInfo.fetch();
+      
+      if (!networkState.isConnected) {
+        return { success: false, error: 'No network connection' };
+      }
 
-    const itemsToSync = [...this.syncQueue];
-    
-    for (const item of itemsToSync) {
-      try {
-        await this.syncItem(item);
-        this.removeFromQueue(item.id);
-      } catch (error) {
-        console.error('Sync failed for item:', item.id, error);
-        item.retryCount = (item.retryCount || 0) + 1;
-        
-        // Remove item if too many retries
-        if (item.retryCount >= 3) {
-          this.removeFromQueue(item.id);
+      const { queue } = await this.getSyncQueue();
+      const results = [];
+
+      for (const item of queue) {
+        try {
+          // Process sync item based on action type
+          const result = await this.processSyncItem(item);
+          
+          if (result.success) {
+            await this.removeFromSyncQueue(item.id);
+            results.push({ ...item, success: true });
+          } else {
+            // Increment attempts and retry later if not max attempts
+            item.attempts++;
+            if (item.attempts >= 3) {
+              await this.removeFromSyncQueue(item.id);
+              results.push({ ...item, success: false, error: 'Max attempts reached' });
+            } else {
+              // Update queue with new attempt count
+              const updatedQueue = queue.map(qItem => 
+                qItem.id === item.id ? item : qItem
+              );
+              await storageService.setItem(STORAGE_KEYS.SYNC_QUEUE, updatedQueue);
+            }
+          }
+        } catch (error) {
+          console.error('Sync item processing error:', error);
+          results.push({ ...item, success: false, error: error.message });
         }
       }
+
+      return { success: true, results };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
+  },
 
-    await this.saveSyncQueue();
-  }
-
-  async syncItem(item) {
-    const { endpoint, method, data } = item;
-    
-    switch (method.toLowerCase()) {
-      case 'post':
-        return await api.post(endpoint, data);
-      case 'put':
-        return await api.put(endpoint, data);
-      case 'patch':
-        return await api.patch(endpoint, data);
-      case 'delete':
-        return await api.delete(endpoint);
+  async processSyncItem(item) {
+    // This would be implemented based on your specific sync requirements
+    // For example:
+    switch (item.action.type) {
+      case 'CREATE_ORDER':
+        // Sync order creation
+        return { success: true };
+      case 'UPDATE_PROFILE':
+        // Sync profile update
+        return { success: true };
       default:
-        throw new Error(`Unsupported method: ${method}`);
+        return { success: false, error: 'Unknown action type' };
     }
-  }
+  },
 
-  removeFromQueue(itemId) {
-    this.syncQueue = this.syncQueue.filter(item => item.id !== itemId);
-  }
-
-  async clearQueue() {
-    this.syncQueue = [];
-    await this.saveSyncQueue();
-  }
-
-  getQueueStatus() {
-    return {
-      isOnline: this.isOnline,
-      queueLength: this.syncQueue.length,
-      pendingActions: this.syncQueue.map(item => ({
-        id: item.id,
-        action: item.action,
-        timestamp: item.timestamp,
-        retryCount: item.retryCount
-      }))
-    };
-  }
-}
-
-export default new OfflineService();
+  async isOnline() {
+    try {
+      const networkState = await NetInfo.fetch();
+      return networkState.isConnected;
+    } catch (error) {
+      return false;
+    }
+  },
+};

@@ -1,157 +1,113 @@
+// src/screens/SignupScreen.js
 import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  StatusBar,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
   Alert,
-  StatusBar,
+  Modal,
 } from 'react-native';
-import axios from 'axios';
+import Icon from 'react-native-vector-icons/Feather';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
-import Icon from 'react-native-vector-icons/Feather';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { theme } from '../styles/theme';
+import { USER_ROLES } from '../utils/constants';
+import api from '../services/api';
 
 const SignupScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
     fullname: '',
     email: '',
     phone: '',
-    password: '',
-    confirmPassword: '',
-    role: 'client',
+    role: USER_ROLES.CLIENT,
     department: '',
     employeeId: '',
+    password: '',
+    confirmPassword: '',
   });
+  
   const [loading, setLoading] = useState(false);
   const [showUserTypes, setShowUserTypes] = useState(false);
 
   const userTypes = [
     {
-      key: 'client',
+      role: USER_ROLES.CLIENT,
       label: 'Client',
-      description: 'Create orders, view bills, send feedback',
+      description: 'For customers and business clients',
       icon: 'user',
-      color: '#10B981',
+      color: '#6366F1',
       requiresApproval: false,
     },
     {
-      key: 'sales_purchase',
-      label: 'Sales & Purchase Employee',
-      description: 'Manage customers, process orders, track sales',
-      icon: 'shopping-cart',
-      color: '#6366F1',
+      role: USER_ROLES.SALES_PURCHASE,
+      label: 'Sales & Purchase',
+      description: 'For sales and purchase team members',
+      icon: 'trending-up',
+      color: '#10B981',
       requiresApproval: true,
     },
     {
-      key: 'marketing',
-      label: 'Marketing Employee',
-      description: 'Manage campaigns, track leads, field operations',
+      role: USER_ROLES.MARKETING,
+      label: 'Marketing',
+      description: 'For marketing team members',
       icon: 'megaphone',
       color: '#F59E0B',
       requiresApproval: true,
     },
     {
-      key: 'office',
+      role: USER_ROLES.OFFICE,
       label: 'Office Employee',
-      description: 'Document management, task tracking, reports',
+      description: 'For general office staff',
       icon: 'briefcase',
       color: '#8B5CF6',
       requiresApproval: true,
     },
   ];
 
-  const selectedUserType = userTypes.find(type => type.key === formData.role);
+  const selectedUserType = userTypes.find(type => type.role === formData.role);
 
-  const validateForm = () => {
-    if (!formData.fullname.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return false;
-    }
-
-    if (!formData.email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
-    }
-
-    if (!formData.phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return false;
-    }
-
-    if (!/^\d{10}$/.test(formData.phone.replace(/[^\d]/g, ''))) {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
-      return false;
-    }
-
-    if (!formData.password.trim()) {
-      Alert.alert('Error', 'Please enter a password');
-      return false;
-    }
-
-    if (formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
-      return false;
+  const handleSignup = async () => {
+    // Validation
+    if (!formData.fullname || !formData.email || !formData.phone || !formData.password) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
-      return false;
+      return;
     }
 
-    // Additional validation for employee roles
-    if (selectedUserType?.requiresApproval) {
-      if (!formData.department.trim()) {
-        Alert.alert('Error', 'Please enter your department');
-        return false;
-      }
-      if (!formData.employeeId.trim()) {
-        Alert.alert('Error', 'Please enter your employee ID');
-        return false;
-      }
+    if (selectedUserType?.requiresApproval && (!formData.department || !formData.employeeId)) {
+      Alert.alert('Error', 'Department and Employee ID are required for employee accounts');
+      return;
     }
 
-    return true;
-  };
-
-  const handleSignup = async () => {
-    if (!validateForm()) return;
-
+    setLoading(true);
     try {
-      setLoading(true);
+      const signupData = {
+        fullname: formData.fullname,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        password: formData.password,
+      };
 
-      const response = await axios.post(
-        'http://192.168.29.161:3000/api/auth/register',
-        {
-          fullname: formData.fullname.trim(),
-          email: formData.email.toLowerCase().trim(),
-          phone: formData.phone.replace(/[^\d]/g, ''),
-          password: formData.password,
-          role: formData.role,
-          department: formData.department.trim(),
-          employee_id: formData.employeeId.trim(),
-        },
-        {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      if (selectedUserType?.requiresApproval) {
+        signupData.department = formData.department;
+        signupData.employee_id = formData.employeeId;
+      }
+
+      const response = await api.post('/api/auth/register', signupData);
 
       if (response.data.success) {
-        const { requiresApproval } = response.data.data;
-
-        if (requiresApproval) {
+        if (selectedUserType?.requiresApproval) {
           Alert.alert(
             'Registration Successful!',
             'Your account has been created and is pending admin approval. You will be notified once your account is approved.',
@@ -178,8 +134,6 @@ const SignupScreen = ({ navigation }) => {
       
       if (error.response?.status === 409) {
         Alert.alert('Registration Failed', 'An account with this email or phone number already exists');
-      } else if (error.code === 'ECONNABORTED') {
-        Alert.alert('Connection Timeout', 'Please check your internet connection and try again');
       } else {
         Alert.alert('Registration Failed', 'Unable to connect to server. Please try again.');
       }
@@ -205,49 +159,55 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.userTypeDesc}>{selectedUserType?.description}</Text>
           </View>
         </View>
-        <Icon name={showUserTypes ? 'chevron-up' : 'chevron-down'} size={20} color="#64748B" />
+        <Icon name={showUserTypes ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
       </TouchableOpacity>
 
-      {showUserTypes && (
-        <View style={styles.userTypeOptions}>
-          {userTypes.map((type) => (
-            <TouchableOpacity
-              key={type.key}
-              style={[
-                styles.userTypeOption,
-                formData.role === type.key && styles.userTypeOptionSelected
-              ]}
-              onPress={() => {
-                setFormData({ ...formData, role: type.key });
-                setShowUserTypes(false);
-              }}
-            >
-              <View style={[styles.userTypeIcon, { backgroundColor: type.color }]}>
-                <Icon name={type.icon} size={20} color="#FFFFFF" />
-              </View>
-              <View style={styles.userTypeText}>
-                <Text style={styles.userTypeTitle}>{type.label}</Text>
-                <Text style={styles.userTypeDesc}>{type.description}</Text>
-                {type.requiresApproval && (
-                  <Text style={styles.approvalNote}>Requires admin approval</Text>
+      <Modal
+        visible={showUserTypes}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUserTypes(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserTypes(false)}
+        >
+          <View style={styles.userTypeModal}>
+            <Text style={styles.modalTitle}>Select Account Type</Text>
+            
+            {userTypes.map((type) => (
+              <TouchableOpacity
+                key={type.role}
+                style={[
+                  styles.userTypeOption,
+                  formData.role === type.role && styles.selectedOption
+                ]}
+                onPress={() => {
+                  setFormData({ ...formData, role: type.role });
+                  setShowUserTypes(false);
+                }}
+              >
+                <View style={styles.userTypeInfo}>
+                  <View style={[styles.userTypeIcon, { backgroundColor: type.color }]}>
+                    <Icon name={type.icon} size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.userTypeText}>
+                    <Text style={styles.userTypeTitle}>{type.label}</Text>
+                    <Text style={styles.userTypeDesc}>{type.description}</Text>
+                    {type.requiresApproval && (
+                      <Text style={styles.approvalText}>Requires admin approval</Text>
+                    )}
+                  </View>
+                </View>
+                {formData.role === type.role && (
+                  <Icon name="check" size={20} color={theme.colors.primary} />
                 )}
-              </View>
-              {formData.role === type.key && (
-                <Icon name="check-circle" size={20} color="#10B981" />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {selectedUserType?.requiresApproval && (
-        <View style={styles.approvalMessage}>
-          <Icon name="info" size={16} color="#F59E0B" />
-          <Text style={styles.approvalMessageText}>
-            Employee accounts require admin approval before you can access the system.
-          </Text>
-        </View>
-      )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 
@@ -366,20 +326,15 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.loginText}>Already have an account?</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('LoginScreen')}
-              style={styles.loginButton}
+              disabled={loading}
             >
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Text style={styles.loginLink}>Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            By creating an account, you agree to our Terms of Service and Privacy Policy
-          </Text>
-        </View>
       </ScrollView>
+
+      {loading && <LoadingSpinner overlay />}
     </KeyboardAvoidingView>
   );
 };
@@ -393,39 +348,53 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    paddingTop: 60,
+    backgroundColor: theme.colors.primary,
+    paddingTop: 50,
     paddingBottom: 30,
-    paddingHorizontal: 20,
-    backgroundColor: '#6366F1',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 24,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   headerContent: {
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   formContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 30,
+    padding: 24,
+  },
+  signupButton: {
+    marginTop: 24,
+  },
+  loginSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  loginText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    marginRight: 8,
+  },
+  loginLink: {
+    fontSize: 16,
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   userTypeContainer: {
     marginBottom: 16,
@@ -433,7 +402,7 @@ const styles = StyleSheet.create({
   userTypeLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   selectedUserType: {
@@ -446,16 +415,16 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   userTypeInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   userTypeIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   userTypeText: {
@@ -464,86 +433,52 @@ const styles = StyleSheet.create({
   userTypeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: theme.colors.textPrimary,
   },
   userTypeDesc: {
     fontSize: 14,
-    color: '#64748B',
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
-  userTypeOptions: {
-    marginTop: 8,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  userTypeModal: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   userTypeOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  userTypeOptionSelected: {
-    backgroundColor: '#F0F9FF',
+  selectedOption: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#F0F4FF',
   },
-  approvalNote: {
+  approvalText: {
     fontSize: 12,
     color: '#F59E0B',
     fontWeight: '500',
     marginTop: 2,
-  },
-  approvalMessage: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FED7AA',
-    marginTop: 8,
-  },
-  approvalMessageText: {
-    fontSize: 14,
-    color: '#92400E',
-    marginLeft: 8,
-    flex: 1,
-    lineHeight: 20,
-  },
-  signupButton: {
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  loginSection: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  loginText: {
-    fontSize: 14,
-    color: '#64748B',
-    marginRight: 4,
-  },
-  loginButton: {
-    padding: 4,
-  },
-  loginButtonText: {
-    fontSize: 14,
-    color: '#6366F1',
-    fontWeight: '600',
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
   },
 });
 
