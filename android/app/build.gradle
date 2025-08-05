@@ -1,52 +1,26 @@
 apply plugin: "com.android.application"
-apply plugin: "org.jetbrains.kotlin.android"
-apply plugin: "com.facebook.react"
-
-def hermesEnabled = project.hasProperty("hermesEnabled") ? project.getProperty("hermesEnabled") : "true"
 
 android {
-    compileSdkVersion rootProject.ext.compileSdkVersion
     namespace "com.feed_pro"
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "com.feed_pro"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdkVersion 21
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
     }
 
-    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
-        }
-    }
-
     buildTypes {
-        debug {
-            signingConfig signingConfigs.debug
-        }
         release {
-            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
-
-    buildToolsVersion rootProject.ext.buildToolsVersion
-    ndkVersion rootProject.ext.ndkVersion
 }
 
 dependencies {
-    implementation("com.facebook.react:react-android")
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
-
-    if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
-    } else {
-        implementation("io.github.react-native-community:jsc-android:241213.1.0")
-    }
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation("com.facebook.react:react-android:0.72.17") // Updated plugin
 }

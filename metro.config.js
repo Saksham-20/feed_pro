@@ -1,11 +1,14 @@
-const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { getDefaultConfig } = require("metro-config");
+const exclusionList = require("metro-config/src/defaults/exclusionList");
 
-/**
- * Metro configuration
- * https://reactnative.dev/docs/metro
- *
- * @type {import('@react-native/metro-config').MetroConfig}
- */
-const config = {};
+module.exports = (async () => {
+  const config = await getDefaultConfig();
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+  return {
+    ...config,
+    resolver: {
+      ...config.resolver,
+      blockList: exclusionList([/backend\/.*/]),
+    },
+  };
+})();
