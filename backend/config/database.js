@@ -3,7 +3,7 @@ const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'business_management',
+  process.env.DB_NAME || 'feed_pro', // ← Changed from 'business_management' to 'feed_pro'
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {
