@@ -17,8 +17,10 @@ const Toast = ({
   type = 'info',
   duration = 3000,
   onDismiss,
+  onHide, // Add support for onHide as well
 }) => {
   const translateY = new Animated.Value(-100);
+  const handleDismiss = onDismiss || onHide; // Use whichever is provided
 
   useEffect(() => {
     if (visible) {
@@ -42,7 +44,7 @@ const Toast = ({
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
-      onDismiss && onDismiss();
+      handleDismiss && handleDismiss();
     });
   };
 

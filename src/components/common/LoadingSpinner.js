@@ -14,7 +14,7 @@ const LoadingSpinner = ({
   text = 'Loading...',
   overlay = false,
   size = 'large',
-  color = theme.colors.primary,
+  color = theme.colors.primary?.['500'] || theme.colors.primary || '#6366F1',
 }) => {
   if (overlay) {
     return (
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   text: {
     marginTop: 12,
     fontSize: 16,
-    color: theme.colors.textPrimary,
+    color: theme.colors.textPrimary || theme.colors.gray?.['800'] || '#1E293B',
     textAlign: 'center',
   },
 });
